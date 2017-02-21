@@ -11,6 +11,9 @@
  **************************************************************/
 
 #include "WiFiManager.h"
+#include "EEPROM.h"
+
+#define  EEPROM_KEY     0x7E
 
 WiFiManagerParameter::WiFiManagerParameter(const char *custom) {
   _id = NULL;
@@ -254,21 +257,72 @@ int WiFiManager::connectWifi(String ssid, String pass) {
   //check if we have ssid and pass and force those, if not, try with last saved values
   if (ssid != "") {
     WiFi.begin(ssid.c_str(), pass.c_str());
+	 if ( _EEPROMCredentials ) {
+		// workaround to save credentials in EEPROM also to avoid an apparent bug in the ESP8266WiFi library
+		union { 
+			struct  station_config conf;
+			uint8_t data[sizeof(struct station_config)];
+		} credentials;
+	 
+	   /*
+		 WiFi.begin calls wifi_station_set_config to store the parameters, but
+		 they are later blank. If we catch them right away we can save it in EEPROM as a backup
+		*/
+		if ( wifi_station_get_config(&credentials.conf) ) {
+			DEBUG_WM(F("Saving credentials in EEPROM"));
+			uint8_t *p = &credentials.data[0];
+			EEPROM.write(_baseEEPROMAddress, EEPROM_KEY);
+			for ( int i=0, base=_baseEEPROMAddress+1; i < sizeof(credentials); i++ ) {
+				EEPROM.write(base++, (byte)*p++);
+			}
+			EEPROM.commit();
+			if ( EEPROM.read(_baseEEPROMAddress) != EEPROM_KEY ) {
+				DEBUG_WM(F("EEPROM key not saved!"));
+			}
+		} else {
+			 DEBUG_WM(F("Failed to retrieve credentials"));
+		}
+	 } 
   } else {
     if (WiFi.SSID()) {
       DEBUG_WM("Using last saved values, should be faster");
-      //trying to fix connection in progress hanging
+		DEBUG_WM(WiFi.SSID());
+		
+		//trying to fix connection in progress hanging
       ETS_UART_INTR_DISABLE();
       wifi_station_disconnect();
       ETS_UART_INTR_ENABLE();
 
-      WiFi.begin();
+		if ( _EEPROMCredentials ) {
+			union { 
+				struct  station_config conf;
+				uint8_t data[sizeof(struct station_config)];
+			} credentials;
+				 
+			if ( EEPROM.read(_baseEEPROMAddress) == EEPROM_KEY ) {
+				DEBUG_WM(F("restoring credentials from EEPROM"));
+				uint8_t *p = &credentials.data[0];
+				for ( int i=0, base=_baseEEPROMAddress+1; i < sizeof(credentials); i++ ) {
+					*p++ = EEPROM.read(base++);
+				}
+				DEBUG_WM((char *)credentials.conf.ssid);
+				DEBUG_WM((char *)credentials.conf.password);
+				WiFi.begin(reinterpret_cast<char *>(credentials.conf.ssid), reinterpret_cast<char *>(credentials.conf.password));
+			} else {
+				// this will happen if the credentials have not been saved yet, so not necessarily an error
+				DEBUG_WM(F("invalid EEPROM key"));
+				WiFi.begin();
+			}
+	   } else {
+		  WiFi.begin();
+	   }
     } else {
       DEBUG_WM("No saved credentials");
     }
   }
-
+  
   int connRes = waitForConnectResult();
+
   DEBUG_WM ("Connection result: ");
   DEBUG_WM ( connRes );
   //not connected, WPS enabled, no pass - first attempt
@@ -382,6 +436,8 @@ void WiFiManager::handleRoot() {
     return;
   }
 
+  WiFi.printDiag(Serial);
+  
   String page = FPSTR(HTTP_HEAD);
   page.replace("{v}", "Options");
   page += FPSTR(HTTP_SCRIPT);
@@ -561,6 +617,10 @@ void WiFiManager::handleWifiSave() {
   //SAVE/connect here
   _ssid = server->arg("s").c_str();
   _pass = server->arg("p").c_str();
+  DEBUG_WM(F("SSID:"));
+  DEBUG_WM(_ssid);
+  DEBUG_WM(F("Password:"));
+  DEBUG_WM(_pass);
 
   //parameters
   for (int i = 0; i < _paramsCount; i++) {
@@ -756,6 +816,23 @@ void WiFiManager::setCustomHeadElement(const char* element) {
 //if this is true, remove duplicated Access Points - defaut true
 void WiFiManager::setRemoveDuplicateAPs(boolean removeDuplicates) {
   _removeDuplicateAPs = removeDuplicates;
+}
+
+/*
+ This workaround is for a problem noted on some ESP-12F modules (others?) where the ESP SDK function wifi_station_set_config(),
+ which is called by WiFi.begin(), does not save the credentials properly. Thus, when we go to connect using the saved credentials,
+ after power cycling, they are blank. This kludgy workaround explicitly saves the credentials elsewhere in EEPROM.
+ For this to work, the following criteria must be met:
+ 
+ - EEPROM.begin() must have already been called
+ - the EEPROM size must be at least 256
+ - the EEPROM range of baseAddress:baseAddress+128 must be otherwise unused
+ 
+ Reconfigure the EEPROM defines if necessary.
+*/
+void  WiFiManager::setSaveCredentialsInEEPROM(const bool saveFlag, const int baseAddress) {
+	_EEPROMCredentials = saveFlag;
+	_baseEEPROMAddress = baseAddress;
 }
 
 

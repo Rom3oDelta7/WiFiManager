@@ -109,6 +109,8 @@ class WiFiManager
     void          setCustomHeadElement(const char* element);
     //if this is true, remove duplicated Access Points - defaut true
     void          setRemoveDuplicateAPs(boolean removeDuplicates);
+	 // if this is true, save WiFi credentials in EEPROM
+	 void          setSaveCredentialsInEEPROM(const bool saveFlag, const int baseAddress = 128);
 
   private:
     std::unique_ptr<DNSServer>        dnsServer;
@@ -142,6 +144,8 @@ class WiFiManager
     boolean       _removeDuplicateAPs     = true;
     boolean       _shouldBreakAfterConfig = false;
     boolean       _tryWPS                 = false;
+	 bool          _EEPROMCredentials      = false;
+	 int           _baseEEPROMAddress      = 128;
 
     const char*   _customHeadElement      = "";
 
