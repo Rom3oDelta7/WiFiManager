@@ -161,6 +161,15 @@ wifiManager.setConfigPortalTimeout(180);
 which will wait 3 minutes (180 seconds). When the time passes, the autoConnect function will return, no matter the outcome.
 Check for connection and if it's still not established do whatever is needed (on some modules I restart them to retry, on others I enter deep sleep)
 
+#### Configuration Portal Abort
+Another way to exit the configuration portal before it completes is to call the function 
+```cpp
+wifiManager.abortConfigPortal();
+```
+which will almost immediately exit the configuration portal.
+The return code from `autoConnect()` or `startConfigPortal()` (see below) will be `false` unless the configuration was completed
+before the abort, in which case it is possible to be `true.`
+
 #### On Demand Configuration Portal
 If you would rather start the configuration portal on demand rather than automatically on a failed connection attempt, then this is for you.
 
@@ -179,17 +188,17 @@ void loop() {
 ```
 See example for a more complex version. [OnDemandConfigPortal](https://github.com/tzapu/WiFiManager/tree/master/examples/OnDemandConfigPortal)
 
-#### Exiting from the Configuration Portal
+#### Manually Exiting from the Configuration Portal
 Normally, once entered, the configuration portal will continue to loop until WiFi credentials have been successfully entered.
 If you'd prefer to exit without joining a WiFi network, say becuase you're going to put the ESP into AP mode, then press the "Exit" button
 on the main webpage.
-If you're using ```autoConnect``` then it will return ```false```.
-Alternatively, if you are using ```startConfigPortal``` it will return the ```WiFi.status()``` value.
+If you're using `autoConnect` then it will return `false`.
+Alternatively, if you are using `startConfigPortal` it will return the `WiFi.status()` value.
 
 #### Set Exit Button Label
 This function can be used to change the label on the configuration portal "Exit" button to the string of your choice.
 Depending on your application, this may help to clarify the setup process for the end user.
-For example, if your application uses the ESP8266's AP (Access Point) Mode if the ```autoConnect``` function returns false,
+For example, if your application uses the ESP8266's AP (Access Point) Mode if the `autoConnect` function returns `false`,
 then you can set the Exit button label to
 ```cpp
 wifiManager.setExitButtonLabel("Use Access Point Mode");

@@ -115,6 +115,8 @@ class WiFiManager
 	 void          setSaveCredentialsInEEPROM(const bool saveFlag, const int baseAddress = 0);
 	 // set the label on the "Exit" button on the WiFi portal page
 	 void          setExitButtonLabel(const char *label);
+    // call this function to abort the config portal setup process
+    void         abortConfigPortal(void);
 
   private:
     std::unique_ptr<DNSServer>        dnsServer;
@@ -150,6 +152,7 @@ class WiFiManager
     boolean       _shouldBreakAfterConfig = false;
     boolean       _tryWPS                 = false;
 	 bool          _EEPROMCredentials      = false;
+    bool          _setupAborted           = false;
 	 int           _baseEEPROMAddress      = 0;
 
     const char*   _customHeadElement      = "";

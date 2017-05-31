@@ -159,12 +159,16 @@ boolean WiFiManager::autoConnect(char const *apName, char const *apPassword) {
   return startConfigPortal(apName, apPassword);
 }
 
+// checks for either a timeout or a user-initiated abort
 boolean WiFiManager::configPortalHasTimeout(){
-    if(_configPortalTimeout == 0 || wifi_softap_get_station_num() > 0){
+   if ( _setupAborted ) {
+       return true;
+    } else if(_configPortalTimeout == 0 || wifi_softap_get_station_num() > 0){
       _configPortalStart = millis(); // kludge, bump configportal start time to skew timeouts
       return false;
+    } else {
+       return (millis() > _configPortalStart + _configPortalTimeout);
     }
-    return (millis() > _configPortalStart + _configPortalTimeout);
 }
 
 boolean WiFiManager::startConfigPortal() {
@@ -190,7 +194,7 @@ boolean  WiFiManager::startConfigPortal(char const *apName, char const *apPasswo
 
   while(1){
 
-    // check if timeout
+    // check if timeout or abort
     if(configPortalHasTimeout()) break;
 
     //DNS
@@ -826,7 +830,7 @@ void WiFiManager::setRemoveDuplicateAPs(boolean removeDuplicates) {
  - the EEPROM size must be at least 128
  - the EEPROM range of baseAddress:baseAddress+127 must be otherwise unused
  
- Reconfigure the EEPROM defines if necessary.
+ User should reconfigure the EEPROM defines if necessary.
 */
 void  WiFiManager::setSaveCredentialsInEEPROM(const bool saveFlag, const int baseAddress) {
 	_EEPROMCredentials = saveFlag;
@@ -840,6 +844,10 @@ void WiFiManager::setExitButtonLabel (const char *label) {
 	_exitButtonLabel = String(label);
 }
 
+// abort the config portal setup process manually
+void WiFiManager::abortConfigPortal(void) {
+   _setupAborted = true;
+}
 
 
 template <typename Generic>
